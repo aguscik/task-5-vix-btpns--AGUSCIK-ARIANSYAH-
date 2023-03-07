@@ -1,0 +1,108 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+// User struct untuk menyimpan data user
+type User struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	PhotoID   int64     `json:"photo_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// DB struct untuk menyimpan koneksi ke database
+type DB struct {
+	conn *sql.DB
+}
+
+func main() {
+	db, err := sql.Open("sqlite3", "./users.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	router := mux.NewRouter()
+
+	// Mendaftarkan handler untuk endpoint register
+	router.HandleFunc("/users/register", registerHandler(db)).Methods("POST")
+
+	// Mendaftarkan handler untuk endpoint login
+	router.HandleFunc("/users/login", loginHandler(db)).Methods("GET")
+
+	// Mendaftarkan handler untuk endpoint update user
+	router.HandleFunc("/users/{userId}", updateUserHandler(db)).Methods("PUT")
+
+	// Mendaftarkan handler untuk endpoint delete user
+	router.HandleFunc("/users/{userId}", deleteUserHandler(db)).Methods("DELETE")
+
+	log.Println("Server started on :8000")
+	log.Fatal(http.ListenAndServe(":8000", router))
+}
+
+// Handler untuk endpoint register
+func registerHandler(db *DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var user User
+		err := json.NewDecoder(r.Body).Decode(&user)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Validasi data
+		if user.ID == 0 || user.Username == "" || user.Email == "" || user.Password == "" {
+			http.Error(w, "ID, Username, Email, dan Password harus diisi", http.StatusBadRequest)
+			return
+		}
+
+		// Insert data ke database
+		stmt, err := db.conn.Prepare(`
+			INSERT INTO users (id, username, email, password, photo_id, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+
+		_, err = stmt.Exec(user.ID, user.Username, user.Email, user.Password, user.PhotoID, time.Now(), time.Now())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+// Handler untuk endpoint login
+func loginHandler(db *DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+		password := r.URL.Query().Get("password")
+
+		// Query data user dari database
+		var user User
+		row := db.conn.QueryRow("SELECT * FROM users WHERE email = ?", email)
+		err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.PhotoID, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			http.Error(w, "Email atau password salah", http.StatusUnauthorized)
+			return
+		}
+
+		if user.Password != password {
+			http
