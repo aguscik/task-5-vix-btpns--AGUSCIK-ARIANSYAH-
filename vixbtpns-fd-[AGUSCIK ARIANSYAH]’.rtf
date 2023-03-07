@@ -1,0 +1,145 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2513
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww14820\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 package main\
+\
+import (\
+	"fmt"\
+	"net/http"\
+	"strconv"\
+)\
+\
+type User struct \{\
+	ID       int\
+	Username string\
+	Password string\
+\}\
+\
+type Image struct \{\
+	ID      int\
+	UserID  int\
+	Name    string\
+	Content []byte\
+\}\
+\
+type Users map[string]User\
+\
+type Images map[int]Image\
+\
+var users Users\
+var images Images\
+\
+func main() \{\
+	users = make(Users)\
+	images = make(Images)\
+\
+	http.HandleFunc("/signup", handleSignup)\
+	http.HandleFunc("/login", handleLogin)\
+	http.HandleFunc("/add-image", handleAddImage)\
+	http.HandleFunc("/delete-image", handleDeleteImage)\
+\
+	err := http.ListenAndServe(":8080", nil)\
+	if err != nil \{\
+		fmt.Println(err)\
+	\}\
+\}\
+\
+func handleSignup(w http.ResponseWriter, r *http.Request) \{\
+	// parse request body to get username and password\
+	// ...\
+\
+	// create a new user\
+	newID := len(users) + 1\
+	user := User\{\
+		ID:       newID,\
+		Username: username,\
+		Password: password,\
+	\}\
+\
+	// add the user to the users map\
+	users[username] = user\
+\
+	// respond with the new user's ID\
+	fmt.Fprintf(w, strconv.Itoa(newID))\
+\}\
+\
+func handleLogin(w http.ResponseWriter, r *http.Request) \{\
+	// parse request body to get username and password\
+	// ...\
+\
+	// check if the user exists and the password is correct\
+	user, ok := users[username]\
+	if !ok || user.Password != password \{\
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)\
+		return\
+	\}\
+\
+	// respond with the user's ID\
+	fmt.Fprintf(w, strconv.Itoa(user.ID))\
+\}\
+\
+func handleAddImage(w http.ResponseWriter, r *http.Request) \{\
+	// parse request body to get user ID and image content\
+	// ...\
+\
+	// check if the user is logged in\
+	userID, err := strconv.Atoi(userIDStr)\
+	if err != nil \{\
+		http.Error(w, "invalid user ID", http.StatusBadRequest)\
+		return\
+	\}\
+	_, ok := images[userID]\
+	if !ok \{\
+		http.Error(w, "user not logged in", http.StatusUnauthorized)\
+		return\
+	\}\
+\
+	// create a new image\
+	newID := len(images) + 1\
+	image := Image\{\
+		ID:      newID,\
+		UserID:  userID,\
+		Name:    "new image",\
+		Content: []byte(content),\
+	\}\
+\
+	// add the image to the images map\
+	images[newID] = image\
+\
+	// respond with the new image's ID\
+	fmt.Fprintf(w, strconv.Itoa(newID))\
+\}\
+\
+func handleDeleteImage(w http.ResponseWriter, r *http.Request) \{\
+	// parse request body to get user ID and image ID\
+	// ...\
+\
+	// check if the user is logged in\
+	userID, err := strconv.Atoi(userIDStr)\
+	if err != nil \{\
+		http.Error(w, "invalid user ID", http.StatusBadRequest)\
+		return\
+	\}\
+	_, ok := images[userID]\
+	if !ok \{\
+		http.Error(w, "user not logged in", http.StatusUnauthorized)\
+		return\
+	\}\
+\
+	// check if the image belongs to the user\
+	imageID, err := strconv.Atoi(imageIDStr)\
+	if err != nil \{\
+		http.Error(w, "invalid image ID", http.StatusBadRequest)\
+		return\
+	\}\
+	image, ok := images[imageID]\
+	if !ok || image.UserID != userID \{\
+		http.Error(w, "image not found or not owned by user", http.StatusBadRequest)\
+		return\
+	\}\
+\
+}
